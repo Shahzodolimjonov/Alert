@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  alert_bot:
+    build: .
+    container_name: qradar_alert_bot
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./.env:/app/.env
+    environment:
+      - TZ=Asia/Tashkent
