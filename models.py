@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 
@@ -23,6 +23,8 @@ class QRadarOffense(BaseModel):
 
 
 class QRadarEvent(BaseModel):
+    model_config = ConfigDict(extra='allow')
+    
     id: Optional[int] = None
     eventname: Optional[str] = None
     username: Optional[str] = None
@@ -33,6 +35,30 @@ class QRadarEvent(BaseModel):
     devicetype: Optional[str] = None
     qid: Optional[int] = None
     logsourceid: Optional[int] = None
+    
+    # Custom Firewall / Check Point fields
+    log_link: Optional[str] = None
+    xlatesrc: Optional[str] = None
+    xlatesport: Optional[str] = None
+    xlatedst: Optional[str] = None
+    xlatedport: Optional[str] = None
+    service_id: Optional[str] = None
+    src: Optional[str] = None
+    service: Optional[str] = None
+    s_port: Optional[str] = None
+    proto: Optional[str] = None
+    product: Optional[str] = None
+    outzone: Optional[str] = None
+    nat_rulenum: Optional[str] = None
+    nat_addtnl_rulenum: Optional[str] = None
+    rule_uid: Optional[str] = None
+    rule_name: Optional[str] = None
+    rule_action: Optional[str] = None
+    parent_rule: Optional[str] = None
+    match_id: Optional[str] = None
+    layer_uuid: Optional[str] = None
+    layer_name: Optional[str] = None
+    loguid: Optional[str] = None
 
 
 class WebhookResponse(BaseModel):

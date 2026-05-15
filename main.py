@@ -155,7 +155,35 @@ def format_event_alert(data: QRadarEvent) -> str:
         6: "🔴", 7: "🔴", 8: "🔴"
     }.get(magnitude_val, "⚠️")
     
-    return f"""
+    # Firewall eventligini aniqlash
+    is_firewall = any([data.rule_name, data.rule_action, data.src, data.product])
+    
+    if is_firewall:
+        product_str = html.escape(str(data.product or 'Firewall'))
+        
+        # Action ga qarab emoji qo'yish
+        action_str = str(data.rule_action or '').lower()
+        if action_str in ["drop", "block", "deny", "reject"]:
+            action_emoji = "⛔"
+        elif action_str in ["accept", "allow", "permit"]:
+            action_emoji = "✅"
+        else:
+            action_emoji = "⚠️"
+            
+        return f"""
+{magnitude_emoji} <b>{product_str} EVENT</b>
+
+🛡️ <b>Rule Name:</b> {html.escape(str(data.rule_name or 'N/A'))}
+⚡ <b>Action:</b> {action_emoji} {html.escape(str(data.rule_action or 'N/A'))}
+🌐 <b>Source:</b> <code>{html.escape(str(data.src or data.sourceip or 'N/A'))}:{html.escape(str(data.s_port or 'N/A'))}</code>
+🎯 <b>Destination:</b> <code>{html.escape(str(data.destinationip or data.xlatedst or 'N/A'))}:{html.escape(str(data.xlatedport or 'N/A'))}</code>
+🔌 <b>Protocol/Service:</b> {html.escape(str(data.proto or 'N/A'))} / {html.escape(str(data.service or 'N/A'))}
+👤 <b>User:</b> {html.escape(str(data.username or 'Unknown'))}
+📋 <b>Event:</b> {html.escape(str(data.eventname or 'Unknown'))}
+🕐 <b>Time:</b> {html.escape(str(data.starttime or 'N/A'))}
+"""
+    else:
+        return f"""
 {magnitude_emoji} <b>QRadar EVENT</b>
 
 👤 <b>User:</b> {html.escape(str(data.username or 'Unknown'))}
