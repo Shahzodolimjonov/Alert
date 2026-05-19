@@ -73,7 +73,7 @@ def sanitize(data: dict) -> dict:
 
 def save_audit(event: str, ip: str, status: str, keys: list = None):
     entry = {
-        "ts": datetime.utcnow().isoformat(),
+        "ts": datetime.now().isoformat(),
         "event": event,
         "ip": ip,
         "status": status,
@@ -123,7 +123,7 @@ def format_offense(data: QRadarOffense) -> str:
 🎯 Dst: <code>{html.escape(str(data.destination_address_ids or 'N/A'))}</code>
 📊 Events: {data.event_count or 'N/A'} | Flows: {data.flow_count or 'N/A'}
 👤 Assigned: {html.escape(str(data.assigned_to or 'Unassigned'))}
-⏰ {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC"""
+⏰ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC+5"""
 
 
 def format_event(data: QRadarEvent) -> str:
