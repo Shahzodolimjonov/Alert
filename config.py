@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     MAX_REQUESTS_PER_MINUTE: int = 100
     
     HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    PORT: int = 514
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
