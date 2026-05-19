@@ -194,49 +194,95 @@ async def process(payload: dict, client_ip: str):
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     peer = writer.get_extra_info('peername')
     client_ip = peer[0] if peer else "unknown"
-    logger.info(f"Connection from {client_ip}")
+    logger.info(f"New connection from {client_ip}")
 
     if not check_ip_whitelist(client_ip):
         logger.warning(f"Blocked {client_ip} - not in whitelist")
         writer.close()
         return
 
+    buffer = b""
     try:
         while True:
-            data = await reader.readline()
+            try:
+                data = await asyncio.wait_for(reader.read(65536), timeout=30.0)
+            except asyncio.TimeoutError:
+                logger.debug(f"Read timeout from {client_ip}")
+                break
+
             if not data:
                 break
 
-            line = data.decode('utf-8', errors='replace').strip()
-            if not line:
-                continue
+            buffer += data
+            logger.info(f"Received {len(data)} bytes from {client_ip}")
+            logger.debug(f"Raw data: {data[:500]}")
+
+        # Connection ended, process buffer
+        if buffer:
+            text = buffer.decode('utf-8', errors='replace').strip()
+            logger.info(f"Total data from {client_ip}: {len(text)} chars")
+            logger.info(f"Data preview: {text[:300]}")
 
             if not check_rate_limit(client_ip):
                 logger.warning(f"Rate limit hit: {client_ip}")
-                await asyncio.sleep(1)
-                continue
+                return
 
-            try:
-                payload = json.loads(line)
-                if isinstance(payload, dict):
-                    await process(payload, client_ip)
-                else:
-                    logger.warning(f"Not a dict: {line[:200]}")
-            except json.JSONDecodeError:
+            # Split by newlines for multiple messages
+            lines = text.split('\n')
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+
                 try:
-                    start = line.find('{')
-                    end = line.rfind('}')
-                    if start != -1 and end != -1 and end > start:
-                        payload = json.loads(line[start:end+1])
-                        if isinstance(payload, dict):
-                            await process(payload, client_ip)
-                            continue
-                except Exception:
-                    pass
-                logger.error(f"Invalid JSON from {client_ip}: {line[:200]}")
+                    payload = json.loads(line)
+                    if isinstance(payload, dict):
+                        await process(payload, client_ip)
+                    else:
+                        logger.warning(f"Not a dict: {line[:200]}")
+                except json.JSONDecodeError:
+                    # Try to extract JSON from syslog wrapper
+                    try:
+                        start = line.find('{')
+                        end = line.rfind('}')
+                        if start != -1 and end != -1 and end > start:
+                            payload = json.loads(line[start:end+1])
+                            if isinstance(payload, dict):
+                                await process(payload, client_ip)
+                                continue
+                    except Exception:
+                        pass
+                    logger.warning(f"Non-JSON data from {client_ip}: {line[:300]}")
+        else:
+            logger.warning(f"No data received from {client_ip}")
 
     except ConnectionResetError:
-        logger.warning(f"Connection reset by {client_ip}")
+        # QRadar may reset connection after sending data - process buffer
+        logger.info(f"Connection reset by {client_ip}, processing buffer ({len(buffer)} bytes)")
+        if buffer:
+            text = buffer.decode('utf-8', errors='replace').strip()
+            logger.info(f"Buffer data: {text[:300]}")
+            lines = text.split('\n')
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    payload = json.loads(line)
+                    if isinstance(payload, dict):
+                        await process(payload, client_ip)
+                except json.JSONDecodeError:
+                    try:
+                        start = line.find('{')
+                        end = line.rfind('}')
+                        if start != -1 and end != -1 and end > start:
+                            payload = json.loads(line[start:end+1])
+                            if isinstance(payload, dict):
+                                await process(payload, client_ip)
+                                continue
+                    except Exception:
+                        pass
+                    logger.warning(f"Non-JSON after reset from {client_ip}: {line[:300]}")
     except Exception as e:
         logger.error(f"Handler error {client_ip}: {e}")
     finally:
