@@ -156,7 +156,11 @@ def format_event(data: QRadarEvent) -> str:
 
 async def process(payload: dict, client_ip: str):
     payload = sanitize(payload)
-    is_offense = "severity" in payload or "offense_type" in payload
+    
+    # QRadar event loglarida qid, eventname yoki sourceip bo'ladi. 
+    # Agar bular bo'lsa, bu Offense emas, balki Event (Hodisa) hisoblanadi.
+    is_event = any(k in payload for k in ["qid", "eventname", "sourceip", "destinationip", "rule_name"])
+    is_offense = not is_event and any(k in payload for k in ["severity", "offense_type"])
 
     if is_offense:
         oid = payload.get("id")
