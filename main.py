@@ -1,3 +1,4 @@
+import asyncio
 import os
 import json
 import html
@@ -191,7 +192,6 @@ async def process(payload: dict, client_ip: str):
 
 
 async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    import asyncio
     peer = writer.get_extra_info('peername')
     client_ip = peer[0] if peer else "unknown"
     logger.info(f"Connection from {client_ip}")
