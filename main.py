@@ -201,37 +201,37 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
         writer.close()
         return
 
-    buffer = b""
+    buffer = ""
     try:
         while True:
             try:
-                data = await asyncio.wait_for(reader.read(65536), timeout=30.0)
-            except asyncio.TimeoutError:
-                logger.debug(f"Read timeout from {client_ip}")
+                data = await reader.read(65536)
+            except ConnectionResetError:
+                logger.info(f"Connection reset by {client_ip}")
+                break
+            except Exception as e:
+                logger.error(f"Read error from {client_ip}: {e}")
                 break
 
             if not data:
+                logger.info(f"Connection closed by remote peer {client_ip}")
                 break
 
-            buffer += data
             logger.info(f"Received {len(data)} bytes from {client_ip}")
-            logger.debug(f"Raw data: {data[:500]}")
+            chunk = data.decode('utf-8', errors='replace')
+            buffer += chunk
 
-        # Connection ended, process buffer
-        if buffer:
-            text = buffer.decode('utf-8', errors='replace').strip()
-            logger.info(f"Total data from {client_ip}: {len(text)} chars")
-            logger.info(f"Data preview: {text[:300]}")
-
-            if not check_rate_limit(client_ip):
-                logger.warning(f"Rate limit hit: {client_ip}")
-                return
-
-            # Split by newlines for multiple messages
-            lines = text.split('\n')
-            for line in lines:
+            # Satrma-satr real-time qayta ishlash (\n belgisi bo'yicha ajratamiz)
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
                 line = line.strip()
                 if not line:
+                    continue
+
+                logger.info(f"Processing real-time log from {client_ip}: {line[:200]}")
+                
+                if not check_rate_limit(client_ip):
+                    logger.warning(f"Rate limit hit: {client_ip}")
                     continue
 
                 try:
@@ -241,7 +241,7 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                     else:
                         logger.warning(f"Not a dict: {line[:200]}")
                 except json.JSONDecodeError:
-                    # Try to extract JSON from syslog wrapper
+                    # Agar JSON syslog wrapper ichida bo'lsa, uni ajratib olishga harakat qilamiz
                     try:
                         start = line.find('{')
                         end = line.rfind('}')
@@ -253,36 +253,17 @@ async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWrit
                     except Exception:
                         pass
                     logger.warning(f"Non-JSON data from {client_ip}: {line[:300]}")
-        else:
-            logger.warning(f"No data received from {client_ip}")
 
-    except ConnectionResetError:
-        # QRadar may reset connection after sending data - process buffer
-        logger.info(f"Connection reset by {client_ip}, processing buffer ({len(buffer)} bytes)")
-        if buffer:
-            text = buffer.decode('utf-8', errors='replace').strip()
-            logger.info(f"Buffer data: {text[:300]}")
-            lines = text.split('\n')
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    payload = json.loads(line)
-                    if isinstance(payload, dict):
-                        await process(payload, client_ip)
-                except json.JSONDecodeError:
-                    try:
-                        start = line.find('{')
-                        end = line.rfind('}')
-                        if start != -1 and end != -1 and end > start:
-                            payload = json.loads(line[start:end+1])
-                            if isinstance(payload, dict):
-                                await process(payload, client_ip)
-                                continue
-                    except Exception:
-                        pass
-                    logger.warning(f"Non-JSON after reset from {client_ip}: {line[:300]}")
+        # Agar aloqa uzilsa va buferda oxirgi ma'lumot qolgan bo'lsa
+        if buffer.strip():
+            line = buffer.strip()
+            try:
+                payload = json.loads(line)
+                if isinstance(payload, dict):
+                    await process(payload, client_ip)
+            except Exception:
+                pass
+
     except Exception as e:
         logger.error(f"Handler error {client_ip}: {e}")
     finally:
