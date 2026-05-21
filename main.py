@@ -132,6 +132,20 @@ def format_event(data: QRadarEvent) -> str:
     emoji = {1: "🟢", 2: "🟡", 3: "🟡", 4: "🟠", 5: "🟠",
              6: "🔴", 7: "🔴", 8: "🔴"}.get(mv, "⚠️")
 
+    is_waf = any([data.url, data.attack_type, data.waf_action]) or (data.product and "waf" in str(data.product).lower())
+    if is_waf:
+        action = str(data.waf_action or data.rule_action or "").lower()
+        act_emoji = "⛔" if action in ["drop", "block", "deny", "reject", "blocked"] else "✅" if action in ["accept", "allow", "permit", "passed"] else "⚠️"
+        return f"""{emoji} <b>{html.escape(str(data.product or 'WAF Alert'))}</b>
+🛡️ Attack: {html.escape(str(data.attack_type or data.eventname or 'N/A'))}
+{act_emoji} Action: {html.escape(str(data.waf_action or data.rule_action or 'N/A'))}
+🌐 Src: {html.escape(str(data.src or data.sourceip or 'N/A'))}
+🎯 Dst: {html.escape(str(data.hostname or data.destinationip or 'N/A'))}
+🔗 URL: {html.escape(str(data.url or 'N/A'))}
+🛠 Method: {html.escape(str(data.http_method or 'N/A'))}
+🕵️ User-Agent: {html.escape(str(data.user_agent or 'N/A'))}
+🕐 {html.escape(str(data.starttime or 'N/A'))}"""
+
     if any([data.rule_name, data.rule_action, data.src, data.product]):
         action = str(data.rule_action or "").lower()
         act_emoji = "⛔" if action in ["drop", "block", "deny", "reject"] else "✅" if action in ["accept", "allow", "permit"] else "⚠️"
@@ -159,7 +173,7 @@ async def process(payload: dict, client_ip: str):
     
     # QRadar event loglarida qid, eventname yoki sourceip bo'ladi. 
     # Agar bular bo'lsa, bu Offense emas, balki Event (Hodisa) hisoblanadi.
-    is_event = any(k in payload for k in ["qid", "eventname", "sourceip", "destinationip", "rule_name"])
+    is_event = any(k in payload for k in ["qid", "eventname", "sourceip", "destinationip", "rule_name", "url", "attack_type", "waf_action"])
     is_offense = not is_event and any(k in payload for k in ["severity", "offense_type"])
 
     if is_offense:

@@ -60,6 +60,14 @@ class QRadarEvent(BaseModel):
     layer_name: Optional[str] = None
     loguid: Optional[str] = None
 
+    # Custom WAF fields
+    url: Optional[str] = None
+    http_method: Optional[str] = None
+    user_agent: Optional[str] = None
+    attack_type: Optional[str] = None
+    waf_action: Optional[str] = None
+    hostname: Optional[str] = None
+
 
 class WebhookResponse(BaseModel):
     status: str
